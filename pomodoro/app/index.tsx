@@ -4,20 +4,31 @@ import { Text, View, StyleSheet, Pressable } from "react-native";
 export default function Index() {
   const WORK_DURATION = 25 * 60;
   const BREAK_DURATION = 5 * 60;
+  const LONG_BREAK_DURATION = 15 * 60;
+
+  const durations = useMemo(
+    () => ({
+      work: WORK_DURATION,
+      break: BREAK_DURATION,
+      longBreak: LONG_BREAK_DURATION,
+    }),
+    [WORK_DURATION, BREAK_DURATION, LONG_BREAK_DURATION]
+  );
 
   const [secondsLeft, setSecondsLeft] = useState(WORK_DURATION);
   const [isRunning, setIsRunning] = useState(false);
-  const [mode, setMode] = useState<"work" | "break">("work");
+  const [mode, setMode] = useState<"work" | "break" | "longBreak">("work");
   const [completed, setCompleted] = useState(0);
+  const [autoStartNext, setAutoStartNext] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const switchMode = useCallback(
-    (nextMode: "work" | "break") => {
+    (nextMode: "work" | "break" | "longBreak", shouldRun = false) => {
       setMode(nextMode);
-      setSecondsLeft(nextMode === "work" ? WORK_DURATION : BREAK_DURATION);
-      setIsRunning(false);
+      setSecondsLeft(durations[nextMode]);
+      setIsRunning(shouldRun);
     },
-    [WORK_DURATION, BREAK_DURATION]
+    [durations]
   );
 
   const formattedTime = useMemo(() => {
@@ -54,11 +65,12 @@ export default function Index() {
 
     if (mode === "work") {
       setCompleted((count) => count + 1);
-      switchMode("break");
+      const shouldLongBreak = (completed + 1) % 4 === 0;
+      switchMode(shouldLongBreak ? "longBreak" : "break", autoStartNext);
     } else {
-      switchMode("work");
+      switchMode("work", autoStartNext);
     }
-  }, [secondsLeft, mode, switchMode]);
+  }, [secondsLeft, mode, switchMode, completed, autoStartNext]);
 
   const toggleTimer = () => setIsRunning((prev) => !prev);
 
@@ -69,24 +81,48 @@ export default function Index() {
 
   const skipPhase = () => {
     if (mode === "work") {
-      switchMode("break");
+      switchMode("break", autoStartNext);
     } else {
-      switchMode("work");
+      switchMode("work", autoStartNext);
     }
   };
+
+  const progress = useMemo(() => {
+    const total = durations[mode];
+    return total === 0 ? 0 : 1 - secondsLeft / total;
+  }, [secondsLeft, mode, durations]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Pomodoro</Text>
       <Text style={styles.subTitle}>
-        {mode === "work" ? "Çalışma" : "Kısa mola"}
+        {mode === "work"
+          ? "Çalışma"
+          : mode === "break"
+          ? "Kısa mola"
+          : "Uzun mola"}
       </Text>
+      <View style={styles.progressBar}>
+        <View style={[styles.progressFill, { flex: progress }]} />
+        <View style={{ flex: 1 - progress }} />
+      </View>
       <View style={styles.timerBox}>
         <Text style={styles.timerText}>{formattedTime}</Text>
       </View>
       <Text style={styles.counter}>
         Tamamlanan pomodoro: {completed.toString().padStart(2, "0")}
       </Text>
+      <Pressable
+        style={[
+          styles.toggle,
+          { backgroundColor: autoStartNext ? "#1b5e20" : "#333" },
+        ]}
+        onPress={() => setAutoStartNext((prev) => !prev)}
+      >
+        <Text style={styles.toggleText}>
+          {autoStartNext ? "Otomatik başlat: açık" : "Otomatik başlat: kapalı"}
+        </Text>
+      </Pressable>
       <View style={styles.divButtons}>
         <ActionButton
           label={isRunning ? "Duraklat" : "Başlat"}
@@ -129,6 +165,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 8,
   },
+  progressBar: {
+    flexDirection: "row",
+    width: 260,
+    height: 10,
+    backgroundColor: "#222",
+    borderRadius: 999,
+    overflow: "hidden",
+    marginTop: 16,
+  },
+  progressFill: {
+    backgroundColor: "#43a047",
+  },
   divButtons: {
     flexDirection: "row",
     marginTop: 20,
@@ -150,6 +198,16 @@ const styles = StyleSheet.create({
   counter: {
     color: "#aaa",
     marginTop: 12,
+  },
+  toggle: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  toggleText: {
+    color: "#fff",
+    fontWeight: "600",
   },
   button: {
     backgroundColor: "#e53935",
