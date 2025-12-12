@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View, StyleSheet, Pressable } from "react-native";
 
+const CATEGORIES = ["Ders Çalışma", "Kodlama", "Proje", "Kitap Okuma"] as const;
+
 export default function HomeScreen() {
   const DEFAULT_WORK = 25 * 60;
   const DEFAULT_BREAK = 5 * 60;
@@ -17,6 +19,14 @@ export default function HomeScreen() {
   const [autoStartNext, setAutoStartNext] = useState(true);
   const [sessionGoal, setSessionGoal] = useState(8);
   const [lastMessage, setLastMessage] = useState("Odaklanmaya hazır mısın?");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [distractionCount, setDistractionCount] = useState(0);
+  const [summary, setSummary] = useState<{
+    durationSec: number;
+    category: string | null;
+    distractions: number;
+    reason: "bitti" | "durduruldu";
+  } | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const durations = useMemo(
@@ -45,6 +55,14 @@ export default function HomeScreen() {
     return `${minutes}:${seconds}`;
   }, [secondsLeft]);
 
+  const formatDuration = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60)
+      .toString()
+      .padStart(2, "0");
+    const s = (totalSeconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
+
   useEffect(() => {
     if (!isRunning) {
       return;
@@ -71,6 +89,12 @@ export default function HomeScreen() {
 
     if (mode === "work") {
       setCompleted((count) => count + 1);
+      setSummary({
+        durationSec: durations[mode],
+        category: selectedCategory,
+        distractions: distractionCount,
+        reason: "bitti",
+      });
       const shouldLongBreak = (completed + 1) % 4 === 0;
       switchMode(shouldLongBreak ? "longBreak" : "break", autoStartNext);
       setLastMessage(
@@ -80,13 +104,44 @@ export default function HomeScreen() {
       switchMode("work", autoStartNext);
       setLastMessage("Çalışma turu başladı, kolay gelsin!");
     }
-  }, [secondsLeft, mode, switchMode, completed, autoStartNext]);
+  }, [
+    secondsLeft,
+    mode,
+    switchMode,
+    completed,
+    autoStartNext,
+    durations,
+    selectedCategory,
+    distractionCount,
+  ]);
 
-  const toggleTimer = () => setIsRunning((prev) => !prev);
+  const toggleTimer = () => {
+    if (!isRunning) {
+      if (!selectedCategory) {
+        setLastMessage("Başlamadan önce kategori seç");
+        return;
+      }
+      setSummary(null);
+      setLastMessage("Başladı, kolay gelsin!");
+      setIsRunning(true);
+      return;
+    }
+
+    const elapsed = durations[mode] - secondsLeft;
+    setSummary({
+      durationSec: elapsed,
+      category: selectedCategory,
+      distractions: distractionCount,
+      reason: "durduruldu",
+    });
+    setIsRunning(false);
+  };
 
   const resetTimer = () => {
     switchMode("work");
     setCompleted(0);
+    setDistractionCount(0);
+    setSummary(null);
   };
 
   const skipPhase = () => {
@@ -141,6 +196,25 @@ export default function HomeScreen() {
           ? "Kısa mola"
           : "Uzun mola"}
       </Text>
+      <View style={styles.chipRow}>
+        {CATEGORIES.map((cat) => (
+          <Pressable
+            key={cat}
+            style={[styles.chip, selectedCategory === cat && styles.chipActive]}
+            onPress={() => setSelectedCategory(cat)}
+            disabled={isRunning}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                selectedCategory === cat && styles.chipTextActive,
+              ]}
+            >
+              {cat}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
       <View style={styles.progressBar}>
         <View style={[styles.progressFill, { flex: progress }]} />
         <View style={{ flex: 1 - progress }} />
@@ -219,6 +293,47 @@ export default function HomeScreen() {
           {autoStartNext ? "Otomatik başlat: açık" : "Otomatik başlat: kapalı"}
         </Text>
       </Pressable>
+      <View style={styles.section}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionTitle}>Dikkat Dağınıklığı</Text>
+          <Text style={styles.sectionValue}>{distractionCount} kez</Text>
+        </View>
+        <View style={styles.row}>
+          <MiniButton
+            label="-1"
+            onPress={() => setDistractionCount((v) => Math.max(0, v - 1))}
+          />
+          <MiniButton
+            label="+1"
+            onPress={() => setDistractionCount((v) => v + 1)}
+          />
+        </View>
+      </View>
+
+      {summary && (
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>
+            Seans özeti (
+            {summary.reason === "bitti" ? "Tamamlandı" : "Durduruldu"})
+          </Text>
+          <Text style={styles.summaryRow}>
+            Süre:{" "}
+            <Text style={styles.summaryValue}>
+              {formatDuration(summary.durationSec)}
+            </Text>
+          </Text>
+          <Text style={styles.summaryRow}>
+            Kategori:{" "}
+            <Text style={styles.summaryValue}>
+              {summary.category ?? "Seçilmedi"}
+            </Text>
+          </Text>
+          <Text style={styles.summaryRow}>
+            Dikkat Dağınıklığı:{" "}
+            <Text style={styles.summaryValue}>{summary.distractions}</Text>
+          </Text>
+        </View>
+      )}
       <View style={styles.divButtons}>
         <ActionButton
           label={isRunning ? "Duraklat" : "Başlat"}
@@ -285,6 +400,32 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     backgroundColor: "#43a047",
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+    justifyContent: "center",
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: "#333",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#0f0f0f",
+  },
+  chipActive: {
+    borderColor: "#43a047",
+    backgroundColor: "#1b5e20",
+  },
+  chipText: {
+    color: "#ccc",
+    fontWeight: "600",
+  },
+  chipTextActive: {
+    color: "#fff",
   },
   divButtons: {
     flexDirection: "row",
@@ -372,5 +513,27 @@ const styles = StyleSheet.create({
   miniButtonText: {
     color: "#fff",
     fontWeight: "600",
+  },
+  summaryCard: {
+    width: 300,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "#1f1f1f",
+    borderRadius: 10,
+    padding: 12,
+    backgroundColor: "#0b0b0b",
+  },
+  summaryTitle: {
+    color: "#fff",
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  summaryRow: {
+    color: "#ccc",
+    marginTop: 4,
+  },
+  summaryValue: {
+    color: "#fff",
+    fontWeight: "700",
   },
 });
