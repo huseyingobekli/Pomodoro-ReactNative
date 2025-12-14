@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Text, View, StyleSheet, Pressable } from "react-native";
+import {
+  Text,
+  View,
+  StyleSheet,
+  Pressable,
+  AppState,
+  Alert,
+} from "react-native";
 
 const CATEGORIES = ["Ders Çalışma", "Kodlama", "Proje", "Kitap Okuma"] as const;
 
@@ -27,7 +34,9 @@ export default function HomeScreen() {
     distractions: number;
     reason: "bitti" | "durduruldu";
   } | null>(null);
+  const [shouldPromptResume, setShouldPromptResume] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const appStateRef = useRef(AppState.currentState);
 
   const durations = useMemo(
     () => ({
@@ -83,6 +92,60 @@ export default function HomeScreen() {
       }
     };
   }, [isRunning]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      const wasActive = appStateRef.current === "active";
+      appStateRef.current = nextState;
+
+      const wentBackground = wasActive && nextState !== "active";
+      if (wentBackground && isRunning) {
+        const elapsed = durations[mode] - secondsLeft;
+        setSummary({
+          durationSec: elapsed,
+          category: selectedCategory,
+          distractions: distractionCount + 1,
+          reason: "durduruldu",
+        });
+        setDistractionCount((v) => v + 1);
+        setIsRunning(false);
+        setShouldPromptResume(true);
+        setLastMessage("Uygulamadan çıkıldı, sayaç duraklatıldı.");
+      }
+
+      if (nextState === "active" && shouldPromptResume && !isRunning) {
+        setShouldPromptResume(false);
+        setLastMessage("Geri döndün. Devam etmek ister misin?");
+        Alert.alert("Devam et?", "Sayaç duraklatıldı.", [
+          {
+            text: "Devam Et",
+            onPress: () => {
+              if (selectedCategory) {
+                setLastMessage("Devam ediyor.");
+                setIsRunning(true);
+              } else {
+                setLastMessage("Kategori seç, sonra Başlat.");
+              }
+            },
+          },
+          {
+            text: "Duraklat",
+            style: "cancel",
+          },
+        ]);
+      }
+    });
+
+    return () => sub.remove();
+  }, [
+    isRunning,
+    durations,
+    mode,
+    secondsLeft,
+    selectedCategory,
+    distractionCount,
+    shouldPromptResume,
+  ]);
 
   useEffect(() => {
     if (secondsLeft > 0) return;
