@@ -1,5 +1,11 @@
 import { StyleSheet, View, Text } from "react-native";
 
+const MOCK_PIE = [
+  { label: "Kodlama", value: 50, color: "#4caf50" },
+  { label: "Ders", value: 30, color: "#56ccf2" },
+  { label: "Kitap", value: 20, color: "#ffb74d" },
+];
+
 export default function ReportsScreen() {
   return (
     <View style={styles.container}>
@@ -45,6 +51,44 @@ export default function ReportsScreen() {
         <Text style={styles.cardHint}>
           Veri bağlantısı eklendiğinde burası gerçek verilerle dolacak.
         </Text>
+      </View>
+
+      <View style={styles.cardFull}>
+        <Text style={styles.cardLabel}>Pasta Grafik (Kategori Dağılımı)</Text>
+        <View style={styles.pieRow}>
+          <View style={styles.pieChartPlaceholder}>
+            <View style={styles.pieCenter}>
+              <Text style={styles.pieCenterText}>%100</Text>
+              <Text style={styles.pieCenterSub}>Odak</Text>
+            </View>
+          </View>
+          <View style={styles.pieLegend}>
+            {MOCK_PIE.map((item) => (
+              <View key={item.label} style={styles.legendRow}>
+                <View
+                  style={[styles.legendSwatch, { backgroundColor: item.color }]}
+                />
+                <Text style={styles.legendLabel}>{item.label}</Text>
+                <Text style={styles.legendValue}>{item.value}%</Text>
+              </View>
+            ))}
+            <View style={styles.pieBar}>
+              {MOCK_PIE.map((item) => (
+                <View
+                  key={item.label}
+                  style={{
+                    flex: item.value,
+                    backgroundColor: item.color,
+                  }}
+                />
+              ))}
+            </View>
+            <Text style={styles.cardHint}>
+              Grafik şu an görsel placeholder; gerçek veriler bağlandığında
+              oranlar dinamik hesaplanacak.
+            </Text>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -113,5 +157,74 @@ const styles = StyleSheet.create({
   },
   sessionText: {
     color: "#ddd",
+  },
+  pieRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  pieChartPlaceholder: {
+    width: 140,
+    height: 140,
+    borderRadius: 999,
+    backgroundColor: "#0f0f0f",
+    borderWidth: 12,
+    borderColor: "#4caf50",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  pieCenter: {
+    width: 70,
+    height: 70,
+    borderRadius: 999,
+    backgroundColor: "#0b0b0b",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pieCenterText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  pieCenterSub: {
+    color: "#aaa",
+    fontSize: 12,
+  },
+  pieLegend: {
+    flex: 1,
+    gap: 6,
+  },
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  legendSwatch: {
+    width: 14,
+    height: 14,
+    borderRadius: 4,
+  },
+  legendLabel: {
+    color: "#fff",
+    flex: 1,
+    fontWeight: "600",
+  },
+  legendValue: {
+    color: "#bbb",
+    fontWeight: "700",
+  },
+  pieBar: {
+    flexDirection: "row",
+    height: 10,
+    borderRadius: 999,
+    overflow: "hidden",
+    marginTop: 6,
+    backgroundColor: "#0f0f0f",
   },
 });
