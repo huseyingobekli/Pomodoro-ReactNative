@@ -7,6 +7,7 @@ import {
   AppState,
   Alert,
 } from "react-native";
+import * as Notifications from "expo-notifications";
 
 const CATEGORIES = ["Ders Çalışma", "Kodlama", "Proje", "Kitap Okuma"] as const;
 
@@ -37,6 +38,7 @@ export default function HomeScreen() {
   const [shouldPromptResume, setShouldPromptResume] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef = useRef(AppState.currentState);
+  const canNotifyRef = useRef(false);
 
   const durations = useMemo(
     () => ({
@@ -71,6 +73,34 @@ export default function HomeScreen() {
     const s = (totalSeconds % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
   };
+
+  const notify = useCallback(async (title: string, body?: string) => {
+    if (!canNotifyRef.current) return;
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body },
+      trigger: null,
+    });
+  }, []);
+
+  useEffect(() => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+
+    (async () => {
+      const perm = await Notifications.getPermissionsAsync();
+      let status = perm.status;
+      if (status !== "granted") {
+        const req = await Notifications.requestPermissionsAsync();
+        status = req.status;
+      }
+      canNotifyRef.current = status === "granted";
+    })();
+  }, []);
 
   useEffect(() => {
     if (!isRunning) {
@@ -111,6 +141,7 @@ export default function HomeScreen() {
         setIsRunning(false);
         setShouldPromptResume(true);
         setLastMessage("Uygulamadan çıkıldı, sayaç duraklatıldı.");
+        void notify("Sayaç duraklatıldı", "Uygulamadan çıkıldı.");
       }
 
       if (nextState === "active" && shouldPromptResume && !isRunning) {
@@ -145,6 +176,7 @@ export default function HomeScreen() {
     selectedCategory,
     distractionCount,
     shouldPromptResume,
+    notify,
   ]);
 
   useEffect(() => {
@@ -158,6 +190,7 @@ export default function HomeScreen() {
         distractions: distractionCount,
         reason: "bitti",
       });
+      void notify("Seans bitti", "Harika, mola zamanı!");
       const shouldLongBreak = (completed + 1) % 4 === 0;
       switchMode(shouldLongBreak ? "longBreak" : "break", autoStartNext);
       setLastMessage(
@@ -176,6 +209,7 @@ export default function HomeScreen() {
     durations,
     selectedCategory,
     distractionCount,
+    notify,
   ]);
 
   const toggleTimer = () => {
@@ -187,6 +221,7 @@ export default function HomeScreen() {
       setSummary(null);
       setLastMessage("Başladı, kolay gelsin!");
       setIsRunning(true);
+      void notify("Seans başladı", selectedCategory ?? undefined);
       return;
     }
 
@@ -198,6 +233,7 @@ export default function HomeScreen() {
       reason: "durduruldu",
     });
     setIsRunning(false);
+    void notify("Seans duraklatıldı", "Sayaç durduruldu.");
   };
 
   const resetTimer = () => {
