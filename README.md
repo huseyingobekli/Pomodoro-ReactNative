@@ -1,4 +1,6 @@
-# 🍅 POMODORO ZAMANLAYICI UYGULAMASI - PROJE DOKÜMANTASYONU
+
+# POMODORO ZAMANLAYICI UYGULAMASI - PROJE DOKÜMANTASYONU
+![ezgif com-resize](https://github.com/user-attachments/assets/c47a9282-c116-43b7-8a95-adc08cf16ba5)
 
 ## 📋 İçindekiler
 
